@@ -76,15 +76,6 @@ process.puppiMet.src = cms.InputTag('puppi')
 
 process.puSequence = cms.Sequence(process.pfNoLepPUPPI * process.puppi * process.puppiNoLep * process.ak4PUPPIJets * process.puppiMet)
 
-# PF cluster producer for HFCal ID
-process.load("RecoParticleFlow.PFClusterProducer.particleFlowRecHitHGC_cff")
-
-# jurassic track isolation
-# https://indico.cern.ch/event/27568/contributions/1618615/attachments/499629/690192/080421.Isolation.Update.RecHits.pdf
-process.load("RecoEgamma.EgammaIsolationAlgos.electronTrackIsolationLcone_cfi")
-process.electronTrackIsolationLcone.electronProducer = cms.InputTag("ecalDrivenGsfElectrons")
-process.electronTrackIsolationLcone.intRadiusBarrel = 0.04
-process.electronTrackIsolationLcone.intRadiusEndcap = 0.04
 
 # electron producer
 moduleElecName = "PatElectronFilter"    
@@ -92,8 +83,6 @@ if (options.inputFormat.lower() == "reco"):
     moduleElecName = "RecoElectronFilter"
 process.electronfilter = cms.EDProducer(moduleElecName)
 process.load("PhaseTwoAnalysis.Electrons."+moduleElecName+"_cfi")
-if (options.inputFormat.lower() == "reco"):
-    process.electronfilter.pfCandsNoLep = "puppiNoLep"
 
 # muon producer
 moduleMuonName = "PatMuonFilter"    
@@ -102,7 +91,7 @@ if (options.inputFormat.lower() == "reco"):
 process.muonfilter = cms.EDProducer(moduleMuonName)
 process.load("PhaseTwoAnalysis.Muons."+moduleMuonName+"_cfi")
 if (options.inputFormat.lower() == "reco"):
-    process.muonfilter.pfCandsNoLep = "puppiNoLep"    
+    process.muonfilter.pfCandsNoLep = cms.InputTag("puppiNoLep")
 
 # producer
 moduleJetName = "PatJetFilter"    
@@ -129,7 +118,7 @@ process.out = cms.OutputModule("PoolOutputModule",
 
 # run
 if (options.inputFormat.lower() == "reco"):
-    process.p = cms.Path(process.electronTrackIsolationLcone * process.particleFlowRecHitHGCSeq * process.puSequence * process.electronfilter * process.muonfilter * process.jetfilter)
+    process.p = cms.Path(process.puSequence * process.electronfilter * process.muonfilter * process.jetfilter)
 else:
     process.p = cms.Path(process.electronfilter * process.muonfilter * process.jetfilter)
 

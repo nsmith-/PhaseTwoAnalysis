@@ -66,7 +66,7 @@ elecLabel = "slimmedElectrons"
 jetLabel = "slimmedJets"
 if (options.inputFormat.lower() == "reco"):
     muonLabel = "muons"
-    elecLabel = "ecalDrivenGsfElectrons"
+    elecLabel = "gedGsfElectrons"
     jetLabel = "ak4PUPPIJets"
 process.selectedMuons = cms.EDFilter("CandPtrSelector",
                                      src = cms.InputTag(muonLabel),
@@ -122,16 +122,6 @@ process.load('RecoMET.METProducers.PFMET_cfi')
 process.puppiMet = process.pfMet.clone()
 process.puppiMet.src = cms.InputTag('puppi')
 
-# PF cluster producer for HFCal ID
-process.load("RecoParticleFlow.PFClusterProducer.particleFlowRecHitHGC_cff")
-
-# jurassic track isolation
-# https://indico.cern.ch/event/27568/contributions/1618615/attachments/499629/690192/080421.Isolation.Update.RecHits.pdf
-process.load("RecoEgamma.EgammaIsolationAlgos.electronTrackIsolationLcone_cfi")
-process.electronTrackIsolationLcone.electronProducer = cms.InputTag("ecalDrivenGsfElectrons")
-process.electronTrackIsolationLcone.intRadiusBarrel = 0.04
-process.electronTrackIsolationLcone.intRadiusEndcap = 0.04
-
 # analysis
 moduleName = "MiniFromPat"    
 if (options.inputFormat.lower() == "reco"):
@@ -153,11 +143,11 @@ process.puSequence = cms.Sequence(process.primaryVertexAssociation * process.pfN
 
 if options.skim:
     if (options.inputFormat.lower() == "reco"):
-        process.p = cms.Path(process.weightCounter * process.electronTrackIsolationLcone * process.particleFlowRecHitHGCSeq * process.puSequence * process.preYieldFilter * process.ntuple)
+        process.p = cms.Path(process.weightCounter * process.puSequence * process.preYieldFilter * process.ntuple)
     else:
         process.p = cms.Path(process.weightCounter*process.preYieldFilter*process.ntuple)
 else:
     if (options.inputFormat.lower() == "reco"):
-        process.p = cms.Path(process.electronTrackIsolationLcone * process.particleFlowRecHitHGCSeq * process.puSequence * process.ntuple)
+        process.p = cms.Path(process.puSequence * process.ntuple)
     else:
         process.p = cms.Path(process.ntuple)
