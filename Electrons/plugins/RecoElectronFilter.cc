@@ -94,6 +94,15 @@ class RecoElectronFilter : public edm::stream::EDProducer<> {
     edm::EDGetTokenT<std::vector<reco::GenParticle>> genPartsToken_;
     edm::EDGetTokenT<std::vector<reco::Vertex>> verticesToken_;    
 
+    //PUPPI isolation tokens
+    edm::EDGetTokenT<edm::ValueMap<float> > PUPPIIsolation_charged_hadrons_;
+    edm::EDGetTokenT<edm::ValueMap<float> > PUPPIIsolation_neutral_hadrons_;
+    edm::EDGetTokenT<edm::ValueMap<float> > PUPPIIsolation_photons_;
+    //PUPPINoLeptons isolation tokens
+    edm::EDGetTokenT<edm::ValueMap<float> > PUPPINoLeptonsIsolation_charged_hadrons_;
+    edm::EDGetTokenT<edm::ValueMap<float> > PUPPINoLeptonsIsolation_neutral_hadrons_;
+    edm::EDGetTokenT<edm::ValueMap<float> > PUPPINoLeptonsIsolation_photons_;
+
 };
 
 //
@@ -115,7 +124,13 @@ RecoElectronFilter::RecoElectronFilter(const edm::ParameterSet& iConfig):
   trackIsoValueMapToken_(consumes<edm::ValueMap<double>>(iConfig.getParameter<edm::InputTag>("trackIsoValueMap"))),
   pfCandsNoLepToken_(consumes<std::vector<reco::PFCandidate>>(iConfig.getParameter<edm::InputTag>("pfCandsNoLep"))),
   genPartsToken_(consumes<std::vector<reco::GenParticle>>(iConfig.getParameter<edm::InputTag>("genParts"))),
-  verticesToken_(consumes<std::vector<reco::Vertex>>(iConfig.getParameter<edm::InputTag>("vertices")))  
+  verticesToken_(consumes<std::vector<reco::Vertex>>(iConfig.getParameter<edm::InputTag>("vertices"))),
+  PUPPIIsolation_charged_hadrons_(consumes<edm::ValueMap<float> >(iConfig.getParameter<edm::InputTag>("puppiIsolationChargedHadrons"))),
+  PUPPIIsolation_neutral_hadrons_(consumes<edm::ValueMap<float> >(iConfig.getParameter<edm::InputTag>("puppiIsolationNeutralHadrons"))),
+  PUPPIIsolation_photons_(consumes<edm::ValueMap<float> >(iConfig.getParameter<edm::InputTag>("puppiIsolationPhotons"))),
+  PUPPINoLeptonsIsolation_charged_hadrons_(consumes<edm::ValueMap<float> >(iConfig.getParameter<edm::InputTag>("puppiNoLeptonsIsolationChargedHadrons"))),
+  PUPPINoLeptonsIsolation_neutral_hadrons_(consumes<edm::ValueMap<float> >(iConfig.getParameter<edm::InputTag>("puppiNoLeptonsIsolationNeutralHadrons"))),
+  PUPPINoLeptonsIsolation_photons_(consumes<edm::ValueMap<float> >(iConfig.getParameter<edm::InputTag>("puppiNoLeptonsIsolationPhotons")))
 {
   produces<std::vector<reco::GsfElectron>>("LooseElectrons");
   produces<std::vector<double>>("LooseElectronRelIso");
@@ -198,6 +213,20 @@ RecoElectronFilter::produce(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.getByToken(pfCandsNoLepToken_, pfCandsNoLep);  
   Handle<std::vector<reco::GenParticle>> genParts;
   iEvent.getByToken(genPartsToken_, genParts);
+
+  edm::Handle<edm::ValueMap<float>> PUPPIIsolation_charged_hadrons;
+  edm::Handle<edm::ValueMap<float>> PUPPIIsolation_neutral_hadrons;
+  edm::Handle<edm::ValueMap<float>> PUPPIIsolation_photons;
+  edm::Handle<edm::ValueMap<float>> PUPPINoLeptonsIsolation_charged_hadrons;
+  edm::Handle<edm::ValueMap<float>> PUPPINoLeptonsIsolation_neutral_hadrons;
+  edm::Handle<edm::ValueMap<float>> PUPPINoLeptonsIsolation_photons;
+  iEvent.getByToken(PUPPIIsolation_charged_hadrons_, PUPPIIsolation_charged_hadrons);
+  iEvent.getByToken(PUPPIIsolation_neutral_hadrons_, PUPPIIsolation_neutral_hadrons);
+  iEvent.getByToken(PUPPIIsolation_photons_, PUPPIIsolation_photons);  
+  iEvent.getByToken(PUPPINoLeptonsIsolation_charged_hadrons_, PUPPINoLeptonsIsolation_charged_hadrons);
+  iEvent.getByToken(PUPPINoLeptonsIsolation_neutral_hadrons_, PUPPINoLeptonsIsolation_neutral_hadrons);
+  iEvent.getByToken(PUPPINoLeptonsIsolation_photons_, PUPPINoLeptonsIsolation_photons);  
+
   std::unique_ptr<std::vector<reco::GsfElectron>> filteredLooseElectrons;
   std::unique_ptr<std::vector<double>> filteredLooseElectronRelIso;
   std::unique_ptr<std::vector<reco::GsfElectron>> filteredMediumElectrons;
@@ -214,18 +243,16 @@ RecoElectronFilter::produce(edm::Event& iEvent, const edm::EventSetup& iSetup)
   for(size_t i = 0; i < elecs->size(); i++) { 
     if (elecs->at(i).pt() < 10.) continue;
     if (fabs(elecs->at(i).eta()) > 3.) continue;
+    Ptr<const reco::GsfElectron> el_edmPtr(elecs,i);
+    double elpt = elecs->at(i).pt();
 
     double relIso = 0.;
-    for (size_t k = 0; k < pfCandsNoLep->size(); k++) {
-      if (ROOT::Math::VectorUtil::DeltaR(elecs->at(i).p4(),pfCandsNoLep->at(k).p4()) > 0.4) continue;
-      relIso += pfCandsNoLep->at(k).pt();
-    }
-    if (elecs->at(i).pt() > 0.) relIso = relIso / elecs->at(i).pt(); 
-    else relIso = -1.;
+    relIso += (*PUPPINoLeptonsIsolation_charged_hadrons)[el_edmPtr];
+    relIso += (*PUPPINoLeptonsIsolation_neutral_hadrons)[el_edmPtr];
+    relIso += (*PUPPINoLeptonsIsolation_photons)[el_edmPtr];
+    relIso /= elpt;
 
-    Ptr<const reco::GsfElectron> el4iso(elecs,i);
-    double eljurassicIso = (*trackIsoValueMap)[el4iso];
-    double elpt = elecs->at(i).pt();
+    double eljurassicIso = (*trackIsoValueMap)[el_edmPtr];
     double elMVAVal = -1.;
     if (prVtx > -0.5 && hgcEmId_->setElectronPtr(&(elecs->at(i)))) 
       elMVAVal = (double)evalMVAElec(elecs->at(i),vertices->at(prVtx),conversions,beamspot,genParts,eljurassicIso/elpt,vertices->size());
